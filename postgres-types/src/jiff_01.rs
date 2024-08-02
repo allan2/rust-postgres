@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use jiff_01::{
     civil::{Date, DateTime, Time},
-    Span, Timestamp,
+    Span, Timestamp, Unit,
 };
 use postgres_protocol::types;
 use std::error::Error;
@@ -22,7 +22,7 @@ fn base_ts() -> Timestamp {
 impl<'a> FromSql<'a> for DateTime {
     fn from_sql(_: &Type, raw: &[u8]) -> Result<DateTime, Box<dyn Error + Sync + Send>> {
         let t = types::timestamp_from_sql(raw)?;
-        Ok(base().checked_add(Span::new().microseconds(t))?)
+        Ok(base().checked_add(Span::new().try_microseconds(t)?)?)
     }
 
     accepts!(TIMESTAMP);
@@ -30,7 +30,7 @@ impl<'a> FromSql<'a> for DateTime {
 
 impl ToSql for DateTime {
     fn to_sql(&self, _: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        types::timestamp_to_sql(self.since(base())?.get_microseconds(), w);
+        types::timestamp_to_sql(self.since(base())?.total(Unit::Microsecond)? as i64, w);
         Ok(IsNull::No)
     }
 
@@ -41,7 +41,7 @@ impl ToSql for DateTime {
 impl<'a> FromSql<'a> for Timestamp {
     fn from_sql(_: &Type, raw: &[u8]) -> Result<Timestamp, Box<dyn Error + Sync + Send>> {
         let t = types::timestamp_from_sql(raw)?;
-        Ok(base_ts().checked_add(Span::new().microseconds(t))?)
+        Ok(base_ts().checked_add(Span::new().try_microseconds(t)?)?)
     }
 
     accepts!(TIMESTAMPTZ);
@@ -49,7 +49,7 @@ impl<'a> FromSql<'a> for Timestamp {
 
 impl ToSql for Timestamp {
     fn to_sql(&self, _: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        types::timestamp_to_sql(self.since(base_ts())?.get_microseconds(), w);
+        types::timestamp_to_sql(self.since(base_ts())?.total(Unit::Microsecond)? as i64, w);
         Ok(IsNull::No)
     }
 
@@ -60,7 +60,7 @@ impl ToSql for Timestamp {
 impl<'a> FromSql<'a> for Date {
     fn from_sql(_: &Type, raw: &[u8]) -> Result<Date, Box<dyn Error + Sync + Send>> {
         let jd = types::date_from_sql(raw)?;
-        Ok(base().date().checked_add(Span::new().days(jd))?)
+        Ok(base().date().checked_add(Span::new().try_days(jd)?)?)
     }
 
     accepts!(DATE);
@@ -68,7 +68,7 @@ impl<'a> FromSql<'a> for Date {
 
 impl ToSql for Date {
     fn to_sql(&self, _: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-        let jd = self.since(base().date())?.get_days();
+        let jd = self.since(base())?.total(Unit::Day)? as i32;
         types::date_to_sql(jd, w);
         Ok(IsNull::No)
     }
@@ -80,7 +80,7 @@ impl ToSql for Date {
 impl<'a> FromSql<'a> for Time {
     fn from_sql(_: &Type, raw: &[u8]) -> Result<Time, Box<dyn Error + Sync + Send>> {
         let usec = types::time_from_sql(raw)?;
-        Ok(Time::midnight() + Span::new().microseconds(usec))
+        Ok(Time::midnight() + Span::new().try_microseconds(usec)?)
     }
 
     accepts!(TIME);
@@ -89,7 +89,7 @@ impl<'a> FromSql<'a> for Time {
 impl ToSql for Time {
     fn to_sql(&self, _: &Type, w: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
         let delta = self.since(Time::midnight())?;
-        types::time_to_sql(delta.get_microseconds(), w);
+        types::time_to_sql(delta.total(Unit::Microsecond)? as i64, w);
         Ok(IsNull::No)
     }
 
