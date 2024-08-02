@@ -1,8 +1,7 @@
 use bytes::BytesMut;
 use jiff_01::{
     civil::{Date, DateTime, Time},
-    tz::TimeZone,
-    Span, Timestamp, Zoned,
+    Span, Timestamp,
 };
 use postgres_protocol::types;
 use std::error::Error;
